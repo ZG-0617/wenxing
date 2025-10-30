@@ -29,11 +29,17 @@ const bgColors = [
 
 // DOM元素引用
 const startBtn = document.getElementById('startBtn');
+let backgroundMusic;
 
 // 初始化事件监听
 function initEventListeners() {
     // 开始按钮事件
-    startBtn.addEventListener('click', startCreatingPopups);
+    startBtn.addEventListener('click', () => {
+        // 尝试播放音乐
+        playMusic();
+        // 开始创建弹窗
+        startCreatingPopups();
+    });
     
     // 空格键关闭所有弹窗
     document.addEventListener('keydown', (event) => {
@@ -151,7 +157,74 @@ function closeAllPopups() {
     console.log('所有弹窗已关闭');
 }
 
+// 简单直接的音乐播放函数
+function playMusic() {
+    try {
+        // 首先尝试从DOM获取现有的音频元素
+        let audio = document.getElementById('backgroundMusic');
+        
+        // 如果DOM中没有音频元素，动态创建一个
+        if (!audio) {
+            console.log('DOM中没有音频元素，创建新的音频元素...');
+            audio = document.createElement('audio');
+            audio.id = 'backgroundMusic';
+            audio.src = '1.mp3';
+            audio.loop = true;
+            audio.style.display = 'none'; // 隐藏音频元素
+            document.body.appendChild(audio);
+        }
+        
+        // 重置播放状态
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 0.5;
+        audio.muted = false;
+        
+        // 保存引用
+        backgroundMusic = audio;
+        
+        // 尝试播放
+        audio.play()
+            .then(() => {
+                console.log('音乐播放成功！');
+            })
+            .catch(error => {
+                console.error('音乐播放失败:', error);
+                console.log('尝试直接通过用户交互播放...');
+                
+                // 直接在用户交互事件中再次尝试
+                setTimeout(() => {
+                    try {
+                        audio.play().then(() => {
+                            console.log('延迟播放尝试成功！');
+                        }).catch(err => {
+                            console.error('延迟播放也失败:', err);
+                            console.log('请检查文件路径是否正确，以及浏览器权限设置。');
+                        });
+                    } catch (innerErr) {
+                        console.error('延迟播放出错:', innerErr);
+                    }
+                }, 10);
+            });
+    } catch (e) {
+        console.error('播放音乐时出错:', e);
+    }
+}
+
 // 页面加载完成后初始化
 window.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
+    // 提示用户点击开始按钮以播放音乐和显示弹窗
+    console.log('请点击开始按钮以播放音乐和显示弹窗');
+    // 预加载音频文件以提高播放响应速度
+    const audio = new Audio();
+    audio.src = '1.mp3';
+    audio.preload = 'auto';
+    audio.addEventListener('canplaythrough', () => {
+        console.log('音频预加载完成，可以开始播放');
+    });
+    audio.addEventListener('error', (e) => {
+        console.error('音频预加载失败:', e.target.error);
+        console.log('请检查音频文件是否存在且可访问');
+    });
 });
