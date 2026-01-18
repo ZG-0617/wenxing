@@ -6,12 +6,12 @@ let heartCanvas = null;
 let heartAnimationId = null;
 
 // 爱心效果参数
-const CANVAS_WIDTH = 640;
-const CANVAS_HEIGHT = 480;
+const CANVAS_WIDTH = 800; // 增大画布宽度
+const CANVAS_HEIGHT = 600; // 增大画布高度
 const CANVAS_CENTER_X = CANVAS_WIDTH / 2;
 const CANVAS_CENTER_Y = CANVAS_HEIGHT / 2;
-const IMAGE_ENLARGE = 11;
-const HEART_COLOR = "#FF99CC";
+const IMAGE_ENLARGE = 15; // 增大放大比例，使爱心更大
+const HEART_COLOR = "#FF69B4"; // 使用更鲜艳的粉色，使爱心更明显
 
 // 配置参数
 const config = {
@@ -94,9 +94,24 @@ function createNextPopup() {
     createdCount++;
     console.log(`弹窗 ${createdCount}/${config.windowCount} 已创建`);
     
-    // 第88个弹窗后显示爱心效果
+    // 第88个弹窗后，关闭所有窗口再显示爱心
     if (createdCount === 88) {
-        showParticleHeart();
+        console.log('第88个窗口已创建，准备关闭所有窗口并显示爱心');
+        
+        // 停止创建新窗口
+        isCreating = false;
+        startBtn.disabled = false;
+        
+        // 延迟一下，让最后一个弹窗显示出来，然后关闭所有窗口
+        setTimeout(() => {
+            // 关闭所有窗口，使用更丝滑的动画
+            smoothCloseAllPopups(() => {
+                // 所有窗口关闭后，显示爱心效果
+                console.log('所有窗口已关闭，开始显示爱心');
+                showParticleHeart();
+            });
+        }, 500);
+        return;
     }
     
     // 计算延迟时间
@@ -163,17 +178,59 @@ function removePopup(popup) {
     }, 300);
 }
 
+// 优化的移除单个弹窗函数，更丝滑的动画
+function removePopup(popup) {
+    // 添加更丝滑的淡出和缩放动画
+    popup.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out, scale 0.5s ease-out';
+    popup.style.opacity = '0';
+    popup.style.transform = 'translateY(-20px)';
+    popup.style.scale = '0.8';
+    
+    // 动画结束后移除元素
+    setTimeout(() => {
+        if (popup.parentNode) {
+            popup.parentNode.removeChild(popup);
+        }
+        // 从数组中移除
+        const index = popupWindows.indexOf(popup);
+        if (index > -1) {
+            popupWindows.splice(index, 1);
+        }
+    }, 500); // 与动画时长匹配
+}
+
+// 丝滑关闭所有弹窗函数，带回调
+function smoothCloseAllPopups(callback) {
+    if (popupWindows.length === 0) {
+        if (callback) callback();
+        return;
+    }
+    
+    console.log('开始丝滑关闭所有弹窗...');
+    
+    // 为每个弹窗添加不同的延迟，实现错落有致的关闭效果
+    popupWindows.forEach((popup, index) => {
+        setTimeout(() => {
+            removePopup(popup);
+        }, index * 30); // 每个弹窗间隔30ms关闭，形成瀑布流效果
+    });
+    
+    // 所有弹窗关闭后调用回调
+    setTimeout(() => {
+        popupWindows = [];
+        console.log('所有弹窗已关闭');
+        if (callback) callback();
+    }, (popupWindows.length * 30) + 500); // 等待所有关闭动画完成
+}
+
 // 关闭所有弹窗
 function closeAllPopups() {
-    popupWindows.forEach(popup => {
-        removePopup(popup);
-    });
-    popupWindows = [];
-    console.log('所有弹窗已关闭');
+    smoothCloseAllPopups();
     
     // 关闭爱心效果
     if (heartAnimationId) {
         cancelAnimationFrame(heartAnimationId);
+        clearTimeout(heartAnimationId); // 清除setTimeout定时器
         heartAnimationId = null;
     }
     if (heartCanvas && heartCanvas.parentNode) {
@@ -239,25 +296,25 @@ class Heart {
 
     // 构建爱心点集合
     build(number) {
-        // 生成原始爱心点
+        // 生成原始爱心点 - 增加数量到3000，使爱心轮廓更细腻
         for (let i = 0; i < number; i++) {
             const t = Math.random() * 2 * Math.PI;
             const { x, y } = heartFunction(t);
             this._points.add(`${x},${y}`);
         }
 
-        // 爱心内扩散 - 边缘
+        // 爱心内扩散 - 边缘 - 增加扩散次数到5，生成更多边缘粒子
         for (const point of this._points) {
             const [_x, _y] = point.split(',').map(Number);
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 5; i++) {
                 const { x, y } = scatterInside(_x, _y, 0.05);
                 this._edgeDiffusionPoints.add(`${Math.round(x)},${Math.round(y)}`);
             }
         }
 
-        // 爱心内再次扩散 - 中心
+        // 爱心内再次扩散 - 中心 - 增加数量到6000，使中心填充更饱满
         const pointArray = Array.from(this._points);
-        for (let i = 0; i < 4000; i++) {
+        for (let i = 0; i < 6000; i++) {
             const randomPoint = pointArray[Math.floor(Math.random() * pointArray.length)];
             const [x, y] = randomPoint.split(',').map(Number);
             const { x: newX, y: newY } = scatterInside(x, y, 0.17);
@@ -281,9 +338,11 @@ class Heart {
         const haloNumber = Math.round(3000 + 4000 * Math.pow(Math.abs(curve(generateFrame / 10 * Math.PI)), 2));
         const allPoints = [];
 
-        // 光环
+        // 光环 - 增加粒子数量，减小粒子大小
         const heartHaloPoint = new Set();
-        for (let i = 0; i < haloNumber; i++) {
+        // 增加光环粒子数量到原来的1.5倍
+        const increasedHaloNumber = Math.round(haloNumber * 1.5);
+        for (let i = 0; i < increasedHaloNumber; i++) {
             const t = Math.random() * 2 * Math.PI;
             let { x, y } = heartFunction(t, 11.6);
             const shrunk = shrink(x, y, haloRadius);
@@ -293,33 +352,33 @@ class Heart {
             if (!heartHaloPoint.has(pointKey)) {
                 heartHaloPoint.add(pointKey);
                 x += Math.floor(Math.random() * 29) - 14; // -14 到 14
-                y += Math.floor(Math.random() * 29) - 14;
-                const size = [1, 2, 2][Math.floor(Math.random() * 3)];
-                allPoints.push({ x, y, size });
+            y += Math.floor(Math.random() * 29) - 14;
+            const size = [1, 1, 2][Math.floor(Math.random() * 3)]; // 减小粒子大小，使效果更细腻
+            allPoints.push({ x, y, size });
             }
         }
 
-        // 轮廓
+        // 轮廓 - 减小粒子大小，使轮廓更细腻
         for (const point of this._points) {
             const [x, y] = point.split(',').map(Number);
             const { x: newX, y: newY } = this.calcPosition(x, y, ratio);
-            const size = Math.floor(Math.random() * 3) + 1; // 1-3
+            const size = Math.floor(Math.random() * 2) + 1; // 1-2，减小轮廓粒子大小
             allPoints.push({ x: Math.round(newX), y: Math.round(newY), size });
         }
 
-        // 内容 - 边缘扩散
+        // 内容 - 边缘扩散 - 减小粒子大小
         for (const point of this._edgeDiffusionPoints) {
             const [x, y] = point.split(',').map(Number);
             const { x: newX, y: newY } = this.calcPosition(x, y, ratio);
-            const size = Math.floor(Math.random() * 2) + 1; // 1-2
+            const size = Math.floor(Math.random() * 2) + 1; // 1-2，减小边缘粒子大小
             allPoints.push({ x: Math.round(newX), y: Math.round(newY), size });
         }
 
-        // 中心扩散
+        // 中心扩散 - 减小粒子大小
         for (const point of this._centerDiffusionPoints) {
             const [x, y] = point.split(',').map(Number);
             const { x: newX, y: newY } = this.calcPosition(x, y, ratio);
-            const size = Math.floor(Math.random() * 2) + 1; // 1-2
+            const size = Math.floor(Math.random() * 2) + 1; // 1-2，减小中心粒子大小
             allPoints.push({ x: Math.round(newX), y: Math.round(newY), size });
         }
 
@@ -329,8 +388,9 @@ class Heart {
     // 计算位置
     calcPosition(x, y, ratio) {
         const force = 1 / Math.pow(Math.pow(x - CANVAS_CENTER_X, 2) + Math.pow(y - CANVAS_CENTER_Y, 2), 0.520);
-        const dx = ratio * force * (x - CANVAS_CENTER_X) + (Math.random() > 0.5 ? 1 : -1);
-        const dy = ratio * force * (y - CANVAS_CENTER_Y) + (Math.random() > 0.5 ? 1 : -1);
+        // 减少随机因素，使粒子位置更稳定
+        const dx = ratio * force * (x - CANVAS_CENTER_X);
+        const dy = ratio * force * (y - CANVAS_CENTER_Y);
         return {
             x: x - dx,
             y: y - dy
@@ -349,9 +409,13 @@ class Heart {
 
 // 爱心绘制函数
 function drawHeart(heart, canvas, ctx, frame = 0) {
+    // 使用requestAnimationFrame的时间戳来控制动画，确保动画更流畅
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     heart.render(ctx, frame);
-    heartAnimationId = requestAnimationFrame(() => drawHeart(heart, canvas, ctx, frame + 1));
+    // 限制帧速率，避免过度计算导致的抖动
+    heartAnimationId = setTimeout(() => {
+        requestAnimationFrame(() => drawHeart(heart, canvas, ctx, frame + 1));
+    }, 160); // 约60fps
 }
 
 // 显示爱心效果函数
@@ -376,10 +440,11 @@ function showParticleHeart() {
     heartCanvas.style.top = '50%';
     heartCanvas.style.left = '50%';
     heartCanvas.style.transform = 'translate(-50%, -50%)';
-    heartCanvas.style.backgroundColor = 'black';
+    heartCanvas.style.backgroundColor = 'transparent';
     heartCanvas.style.zIndex = '9999';
     heartCanvas.style.borderRadius = '8px';
     heartCanvas.style.boxShadow = '0 0 20px rgba(255, 153, 204, 0.5)';
+    heartCanvas.style.pointerEvents = 'none'; // 允许点击穿透
     
     // 添加到文档
     document.body.appendChild(heartCanvas);
