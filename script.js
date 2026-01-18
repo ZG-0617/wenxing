@@ -4,6 +4,7 @@ let isCreating = false;
 let createdCount = 0;
 let heartCanvas = null;
 let heartAnimationId = null;
+let musicStarted = false; // 音乐是否已经开始播放的标志位
 
 // 爱心效果参数
 const CANVAS_WIDTH = 800; // 增大画布宽度
@@ -24,7 +25,7 @@ const config = {
 // 多条消息（从原Python代码复制）
 const tips = [
     '多喝点水', '保持微笑', '每天都要元气满满', '记得吃水果', '保持好心情', '好好爱自己', 
-    '梦想成真', '期待下一次遇见', '金榜题名', '顺利利', '早点休息', '愿所有烦恼都消失哦',
+    '梦想成真', '期待下一次遇见', '小宝爱你哦', '顺利利', '早点休息', '愿所有烦恼都消失哦',
     '别熬夜', '今天过得开心嘛', '天冷了，多穿衣服', '每天都有温暖', '烦恼烟消云散', '期待下次见面',
     '所求皆如愿', '收获满满幸福', '下次一起去吃', '被世界温柔待', '活力满满好运', '发现生活美好',
     '美好如期而至', '不开心找我聊', '你已经很棒啦', '今天也在发光', '难题慢慢来', '今天辛苦啦',
@@ -47,8 +48,35 @@ function initEventListeners() {
     startBtn.addEventListener('click', () => {
         // 尝试播放音乐
         playMusic();
-        // 开始创建弹窗
-        startCreatingPopups();
+        
+        // 如果当前有爱心效果，先关闭它
+        if (heartCanvas) {
+            console.log('检测到爱心效果，先关闭爱心');
+            
+            // 添加爱心消散动画
+            heartCanvas.style.transition = 'opacity 0.5s ease-out';
+            heartCanvas.style.opacity = '0';
+            
+            // 动画结束后移除爱心画布
+            setTimeout(() => {
+                // 关闭爱心效果
+                if (heartAnimationId) {
+                    cancelAnimationFrame(heartAnimationId);
+                    clearTimeout(heartAnimationId);
+                    heartAnimationId = null;
+                }
+                if (heartCanvas && heartCanvas.parentNode) {
+                    heartCanvas.parentNode.removeChild(heartCanvas);
+                    heartCanvas = null;
+                }
+                
+                // 开始创建弹窗
+                startCreatingPopups();
+            }, 500);
+        } else {
+            // 没有爱心效果，直接开始创建弹窗
+            startCreatingPopups();
+        }
     });
     
     // 空格键关闭所有弹窗
@@ -443,7 +471,8 @@ function showParticleHeart() {
     heartCanvas.style.backgroundColor = 'transparent';
     heartCanvas.style.zIndex = '9999';
     heartCanvas.style.borderRadius = '8px';
-    heartCanvas.style.boxShadow = '0 0 20px rgba(255, 153, 204, 0.5)';
+    heartCanvas.style.opacity = '1'; // 确保爱心完全不透明
+    // 移除boxShadow，避免淡粉色方框
     heartCanvas.style.pointerEvents = 'none'; // 允许点击穿透
     
     // 添加到文档
@@ -459,9 +488,17 @@ function showParticleHeart() {
     drawHeart(heart, heartCanvas, ctx);
 }
 
-// 改进的音乐播放函数，适合GitHub Pages环境
+// 改进的音乐播放函数，只在第一次点击时开始播放
 function playMusic() {
     try {
+        // 如果音乐已经开始播放，直接返回，不再重新播放
+        if (musicStarted) {
+            console.log('音乐已经开始播放，不再重新播放');
+            return;
+        }
+        
+        console.log('开始播放音乐...');
+        
         // 首先尝试从DOM获取现有的音频元素
         let audio = document.getElementById('backgroundMusic');
         
@@ -494,21 +531,42 @@ function playMusic() {
             });
         }
         
-        // 重置播放状态
-        audio.pause();
-        audio.currentTime = 0;
-        audio.volume = 0.5;
-        audio.muted = false;
+        // 确保音频元素已经加载
+        if (audio.readyState < 2) {
+            console.log('音频尚未完全加载，等待可播放状态...');
+            audio.addEventListener('canplaythrough', function() {
+                playFromStart(audio);
+            }, { once: true });
+        } else {
+            // 音频已加载，直接播放
+            playFromStart(audio);
+        }
         
         // 保存引用
         backgroundMusic = audio;
         
-        // 直接在用户交互事件中播放（不使用延迟）
+    } catch (e) {
+        console.error('播放音乐时出错:', e);
+    }
+}
+
+// 从开头播放音乐的辅助函数
+function playFromStart(audio) {
+    try {
+        // 设置音量
+        audio.volume = 0.5;
+        audio.muted = false;
+        
+        console.log('尝试播放音乐...');
+        
+        // 直接播放
         const playPromise = audio.play();
         
         if (playPromise !== undefined) {
             playPromise.then(() => {
                 console.log('音乐播放成功！');
+                // 音乐播放成功后，设置标志位为true
+                musicStarted = true;
             }).catch(error => {
                 console.error('音乐播放失败:', error);
                 console.log('请检查：');
@@ -517,9 +575,12 @@ function playMusic() {
                 console.log('3. GitHub Pages是否正确部署了所有文件');
                 console.log('4. 尝试在不同浏览器中打开');
             });
+        } else {
+            // 旧浏览器不支持Promise返回值，假设播放成功
+            musicStarted = true;
         }
     } catch (e) {
-        console.error('播放音乐时出错:', e);
+        console.error('从开头播放音乐时出错:', e);
     }
 }
 
